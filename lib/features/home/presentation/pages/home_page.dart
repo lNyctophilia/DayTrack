@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/language_service.dart';
@@ -26,15 +27,26 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late WorkDayRepository _repository;
   late int _currentYear;
   late int _currentMonth;
   MonthlyData _monthlyData = MonthlyData.empty(2026, 1);
   bool _isLoading = true;
 
-  // Animasyon kontrolü
-  int _slideDirection = 1; // 1: sağa (önceki ay), -1: sola (sonraki ay)
+  // Manuel animasyon kontrolü (sistem ayarından bağımsız)
+  AnimationController? _slideController;
+  late Animation<Offset> _inSlideAnimation;
+  late Animation<Offset> _outSlideAnimation;
+  late Animation<double> _inFadeAnimation;
+  late Animation<double> _outFadeAnimation;
+
+  // Önceki ay verileri (çıkış animasyonu için)
+  int? _prevYear;
+  int? _prevMonth;
+  MonthlyData? _prevMonthlyData;
+  bool _isAnimating = false;
+  int _slideDirection = 1;
 
   @override
   void initState() {
@@ -47,6 +59,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _slideController?.dispose();
     super.dispose();
   }
 
@@ -62,37 +75,91 @@ class _HomePageState extends State<HomePage> {
     widget.storage.setLastViewed(_currentYear, _currentMonth);
   }
 
-  /// Animasyonlu ay değiştirme
+  /// Animasyonlu ay değiştirme — sistem animasyon ayarını yok sayar
   void _changeMonth(int direction) {
-    setState(() {
-      _slideDirection = direction;
-      if (direction == 1) {
-        // Önceki ay
-        if (_currentMonth == 1) {
-          _currentMonth = 12;
-          _currentYear--;
-        } else {
-          _currentMonth--;
-        }
+    if (_isAnimating) return;
+
+    // Önceki ay verilerini sakla
+    _prevYear = _currentYear;
+    _prevMonth = _currentMonth;
+    _prevMonthlyData = _monthlyData;
+    _slideDirection = direction;
+
+    // Yeni ayı hesapla
+    if (direction == 1) {
+      if (_currentMonth == 1) {
+        _currentMonth = 12;
+        _currentYear--;
       } else {
-        // Sonraki ay
-        if (_currentMonth == 12) {
-          _currentMonth = 1;
-          _currentYear++;
-        } else {
-          _currentMonth++;
-        }
+        _currentMonth--;
       }
-    });
+    } else {
+      if (_currentMonth == 12) {
+        _currentMonth = 1;
+        _currentYear++;
+      } else {
+        _currentMonth++;
+      }
+    }
+
+    // Sistem animasyon ölçeğini geçici olarak 1.0 yap
+    final originalTimeDilation = timeDilation;
+    timeDilation = 1.0;
+
+    _slideController?.dispose();
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
+    // Giren widget: karşı taraftan gelir
+    _inSlideAnimation = Tween<Offset>(
+      begin: Offset(-direction.toDouble(), 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController!,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Çıkan widget: aynı yöne gider
+    _outSlideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset(direction.toDouble(), 0),
+    ).animate(CurvedAnimation(
+      parent: _slideController!,
+      curve: Curves.easeInCubic,
+    ));
+
+    _inFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _slideController!, curve: Curves.easeOut),
+    );
+
+    _outFadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _slideController!, curve: Curves.easeIn),
+    );
+
+    setState(() => _isAnimating = true);
+
     _loadData(silent: true);
+
+    _slideController!.forward().then((_) {
+      // Sistem ayarını geri yükle
+      timeDilation = originalTimeDilation;
+      setState(() {
+        _isAnimating = false;
+        _prevMonthlyData = null;
+        _prevYear = null;
+        _prevMonth = null;
+      });
+    });
   }
 
   void _previousMonth() {
-    _changeMonth(1); // sağa kayar (önceki ay)
+    _changeMonth(1);
   }
 
   void _nextMonth() {
-    _changeMonth(-1); // sola kayar (sonraki ay)
+    _changeMonth(-1);
   }
 
   void _openDayEntry(DateTime date, WorkDay? existing) {
@@ -316,10 +383,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           // Üst bar — farklı renk, yuvarlak alt köşeler
           _buildTopBar(),
-          // Ay navigasyonu — ortalanmış
-          _buildMonthNavigator(),
-          const SizedBox(height: 6),
-          // Takvim + Özet — sola/sağa kaydırarak ay değiştirme, ekranda ortalanmış
+          // Takvim + Ay navigasyonu + Özet — kaydırılabilir, ortalanmış
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -329,65 +393,116 @@ class _HomePageState extends State<HomePage> {
                   )
                 : GestureDetector(
                     onHorizontalDragEnd: (details) {
-                      const threshold = 300.0; // px/s hız eşiği
-                      final velocity =
-                          details.primaryVelocity ?? 0;
+                      const threshold = 300.0;
+                      final velocity = details.primaryVelocity ?? 0;
                       if (velocity > threshold) {
-                        _previousMonth(); // sağa kaydır → önceki ay
+                        _previousMonth();
                       } else if (velocity < -threshold) {
-                        _nextMonth(); // sola kaydır → sonraki ay
+                        _nextMonth();
                       }
                     },
                     behavior: HitTestBehavior.opaque,
                     child: Center(
                       child: SingleChildScrollView(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (child, animation) {
-                            // Giren widget key'i güncel ay ile eşleşir
-                            final isIncoming = child.key == ValueKey('$_currentYear-$_currentMonth');
-                            final offsetTween = Tween<Offset>(
-                              begin: Offset(isIncoming ? -_slideDirection.toDouble() : _slideDirection.toDouble(), 0),
-                              end: Offset.zero,
-                            );
-                            return SlideTransition(
-                              position: offsetTween.animate(animation),
-                              child: FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: Column(
-                            key: ValueKey('$_currentYear-$_currentMonth'),
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CalendarGrid(
-                                year: _currentYear,
-                                month: _currentMonth,
-                                monthlyData: _monthlyData,
-                                lang: widget.lang,
-                                onDayTapped: _openDayEntry,
-                                onDayLongPressed: _showNotePreview,
-                              ),
-                              const SizedBox(height: 20),
-                              // Özet kartı
-                              SummaryCard(
-                                totalDays: _monthlyData.totalDays,
-                                totalEarnings: _monthlyData.totalEarnings,
-                                lang: widget.lang,
-                              ),
-                            ],
-                          ),
-                        ),
+                        child: _isAnimating
+                            ? _buildAnimatedContent()
+                            : _buildStaticContent(),
                       ),
                     ),
                   ),
           ),
         ],
       ),
+    );
+  }
+
+  /// Animasyon yokken statik içerik
+  Widget _buildStaticContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildMonthNavigator(_currentYear, _currentMonth),
+        const SizedBox(height: 16),
+        CalendarGrid(
+          year: _currentYear,
+          month: _currentMonth,
+          monthlyData: _monthlyData,
+          lang: widget.lang,
+          onDayTapped: _openDayEntry,
+          onDayLongPressed: _showNotePreview,
+        ),
+        const SizedBox(height: 16),
+        SummaryCard(
+          totalDays: _monthlyData.totalDays,
+          totalEarnings: _monthlyData.totalEarnings,
+          lang: widget.lang,
+        ),
+      ],
+    );
+  }
+
+  /// Animasyon sırasında iki katman üst üste
+  Widget _buildAnimatedContent() {
+    return Stack(
+      children: [
+        // Çıkan (eski) içerik
+        if (_prevMonthlyData != null)
+          SlideTransition(
+            position: _outSlideAnimation,
+            child: FadeTransition(
+              opacity: _outFadeAnimation,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildMonthNavigator(_prevYear!, _prevMonth!),
+                  const SizedBox(height: 16),
+                  CalendarGrid(
+                    year: _prevYear!,
+                    month: _prevMonth!,
+                    monthlyData: _prevMonthlyData!,
+                    lang: widget.lang,
+                    onDayTapped: _openDayEntry,
+                    onDayLongPressed: _showNotePreview,
+                  ),
+                  const SizedBox(height: 16),
+                  SummaryCard(
+                    totalDays: _prevMonthlyData!.totalDays,
+                    totalEarnings: _prevMonthlyData!.totalEarnings,
+                    lang: widget.lang,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        // Giren (yeni) içerik
+        SlideTransition(
+          position: _inSlideAnimation,
+          child: FadeTransition(
+            opacity: _inFadeAnimation,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildMonthNavigator(_currentYear, _currentMonth),
+                const SizedBox(height: 16),
+                CalendarGrid(
+                  year: _currentYear,
+                  month: _currentMonth,
+                  monthlyData: _monthlyData,
+                  lang: widget.lang,
+                  onDayTapped: _openDayEntry,
+                  onDayLongPressed: _showNotePreview,
+                ),
+                const SizedBox(height: 16),
+                SummaryCard(
+                  totalDays: _monthlyData.totalDays,
+                  totalEarnings: _monthlyData.totalEarnings,
+                  lang: widget.lang,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -453,7 +568,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildMonthNavigator() {
+  Widget _buildMonthNavigator(int year, int month) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Container(
@@ -488,7 +603,7 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   children: [
                     Text(
-                      widget.lang.monthName(_currentMonth),
+                      widget.lang.monthName(month),
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -497,7 +612,7 @@ class _HomePageState extends State<HomePage> {
                       textAlign: TextAlign.center,
                     ),
                     Text(
-                      '$_currentYear',
+                      '$year',
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,

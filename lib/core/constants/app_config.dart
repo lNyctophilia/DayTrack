@@ -2,6 +2,6 @@
 class AppConfig {
   AppConfig._();
 
-  static const String version = '1.6.0';
+  static const String version = '1.7.0';
   static const String developerName = 'lNyctophilia';
 }
