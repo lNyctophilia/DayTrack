@@ -26,12 +26,18 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late WorkDayRepository _repository;
   late int _currentYear;
   late int _currentMonth;
   MonthlyData _monthlyData = MonthlyData.empty(2026, 1);
   bool _isLoading = true;
+
+  // Animasyon kontrolü
+  late AnimationController _slideController;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+  int _slideDirection = 0; // -1: sola, 1: sağa
 
   @override
   void initState() {
@@ -39,7 +45,35 @@ class _HomePageState extends State<HomePage> {
     _repository = WorkDayRepository(widget.storage);
     _currentYear = widget.storage.getLastViewedYear();
     _currentMonth = widget.storage.getLastViewedMonth();
+
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _fadeAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _slideController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -54,28 +88,83 @@ class _HomePageState extends State<HomePage> {
     widget.storage.setLastViewed(_currentYear, _currentMonth);
   }
 
-  void _previousMonth() {
+  /// Animasyonlu ay değiştirme
+  Future<void> _animateMonthChange(int direction) async {
+    if (_slideController.isAnimating) return;
+
+    _slideDirection = direction;
+
+    // Çıkış animasyonu — mevcut içerik kayarak çıkar
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset(direction.toDouble(), 0),
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeInCubic,
+    ));
+
+    _fadeAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeInCubic,
+    ));
+
+    await _slideController.forward();
+
+    // Ay değiştir
     setState(() {
-      if (_currentMonth == 1) {
-        _currentMonth = 12;
-        _currentYear--;
+      if (direction == 1) {
+        // Önceki ay
+        if (_currentMonth == 1) {
+          _currentMonth = 12;
+          _currentYear--;
+        } else {
+          _currentMonth--;
+        }
       } else {
-        _currentMonth--;
+        // Sonraki ay
+        if (_currentMonth == 12) {
+          _currentMonth = 1;
+          _currentYear++;
+        } else {
+          _currentMonth++;
+        }
       }
     });
-    _loadData();
+
+    // Veriyi yükle
+    await _loadData();
+
+    // Giriş animasyonu — yeni içerik karşı taraftan girer
+    _slideController.reset();
+
+    _slideAnimation = Tween<Offset>(
+      begin: Offset(-direction.toDouble(), 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _slideController.forward();
+  }
+
+  void _previousMonth() {
+    _animateMonthChange(1); // sağa kayar (önceki ay)
   }
 
   void _nextMonth() {
-    setState(() {
-      if (_currentMonth == 12) {
-        _currentMonth = 1;
-        _currentYear++;
-      } else {
-        _currentMonth++;
-      }
-    });
-    _loadData();
+    _animateMonthChange(-1); // sola kayar (sonraki ay)
   }
 
   void _openDayEntry(DateTime date, WorkDay? existing) {
@@ -141,6 +230,7 @@ class _HomePageState extends State<HomePage> {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Üst başlık
               Container(
@@ -194,73 +284,80 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-              // İçerik
+              // İçerik — sola yaslı
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                 child: hasNote
                     ? Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Konum bilgisi
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: (existing.isCityCenter
+                          // Konum bilgisi — sola yaslı
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: (existing.isCityCenter
+                                        ? AppColors.cityInner
+                                        : AppColors.cityOuter)
+                                    .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                existing.isCityCenter
+                                    ? widget.lang.tr('city_inner')
+                                    : widget.lang.tr('city_outer'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: existing.isCityCenter
                                       ? AppColors.cityInner
-                                      : AppColors.cityOuter)
-                                  .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              existing.isCityCenter
-                                  ? widget.lang.tr('city_inner')
-                                  : widget.lang.tr('city_outer'),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: existing.isCityCenter
-                                    ? AppColors.cityInner
-                                    : AppColors.cityOuter,
+                                      : AppColors.cityOuter,
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(height: 12),
-                          // Not metni
-                          Text(
-                            existing.note.trim(),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              height: 1.5,
-                              color: AppColors.textPrimary,
+                          // Not metni — sola yaslı
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              existing.note.trim(),
+                              textAlign: TextAlign.left,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                height: 1.5,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ),
                         ],
                       )
-                    : Center(
-                        child: Column(
-                          children: [
-                            Icon(
-                              hasEntry
-                                  ? Icons.note_outlined
-                                  : Icons.event_busy_rounded,
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            hasEntry
+                                ? Icons.note_outlined
+                                : Icons.event_busy_rounded,
+                            color: AppColors.textHint,
+                            size: 36,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            hasEntry
+                                ? widget.lang.tr('no_note')
+                                : widget.lang.tr('no_entry'),
+                            textAlign: TextAlign.left,
+                            style: const TextStyle(
+                              fontSize: 14,
                               color: AppColors.textHint,
-                              size: 36,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              hasEntry
-                                  ? widget.lang.tr('no_note')
-                                  : widget.lang.tr('no_entry'),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textHint,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
               ),
             ],
@@ -294,7 +391,7 @@ class _HomePageState extends State<HomePage> {
           // Ay navigasyonu — ortalanmış
           _buildMonthNavigator(),
           const SizedBox(height: 12),
-          // Takvim + Özet — sola/sağa kaydırarak ay değiştirme
+          // Takvim + Özet — sola/sağa kaydırarak ay değiştirme, ekranda ortalanmış
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -314,25 +411,40 @@ class _HomePageState extends State<HomePage> {
                       }
                     },
                     behavior: HitTestBehavior.opaque,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          CalendarGrid(
-                            year: _currentYear,
-                            month: _currentMonth,
-                            monthlyData: _monthlyData,
-                            lang: widget.lang,
-                            onDayTapped: _openDayEntry,
-                            onDayLongPressed: _showNotePreview,
+                    child: Center(
+                      child: SingleChildScrollView(
+                        child: AnimatedBuilder(
+                          animation: _slideController,
+                          builder: (context, child) {
+                            return SlideTransition(
+                              position: _slideAnimation,
+                              child: FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CalendarGrid(
+                                year: _currentYear,
+                                month: _currentMonth,
+                                monthlyData: _monthlyData,
+                                lang: widget.lang,
+                                onDayTapped: _openDayEntry,
+                                onDayLongPressed: _showNotePreview,
+                              ),
+                              const SizedBox(height: 8),
+                              // Özet kartı
+                              SummaryCard(
+                                totalDays: _monthlyData.totalDays,
+                                totalEarnings: _monthlyData.totalEarnings,
+                                lang: widget.lang,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          // Özet kartı
-                          SummaryCard(
-                            totalDays: _monthlyData.totalDays,
-                            totalEarnings: _monthlyData.totalEarnings,
-                            lang: widget.lang,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
