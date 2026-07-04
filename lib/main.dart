@@ -62,7 +62,7 @@ class _DayTrackAppState extends State<DayTrackApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'DayTrack',
+      title: 'Day Track',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: HomePage(

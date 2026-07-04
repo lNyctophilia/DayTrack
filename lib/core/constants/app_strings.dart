@@ -3,7 +3,7 @@ class AppStrings {
   AppStrings._();
 
   static const Map<String, Map<String, String>> _strings = {
-    'app_name': {'tr': 'DayTrack', 'en': 'DayTrack'},
+    'app_name': {'tr': 'Day Track', 'en': 'Day Track'},
 
     // Takvim
     'total_days': {'tr': 'Toplam Gün', 'en': 'Total Days'},

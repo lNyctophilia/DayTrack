@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_config.dart';
 import '../../../../core/services/language_service.dart';
 import '../../../../core/services/storage_service.dart';
 
@@ -25,8 +26,8 @@ class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _cityInnerController;
   late TextEditingController _cityOuterController;
 
-  static const String _appVersion = '1.0.0';
-  static const String _developerName = 'lNyctophilia';
+  static String get _appVersion => AppConfig.version;
+  static String get _developerName => AppConfig.developerName;
 
   @override
   void initState() {
@@ -395,7 +396,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'DayTrack',
+            'Day Track',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,

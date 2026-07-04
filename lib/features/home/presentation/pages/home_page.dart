@@ -110,90 +110,112 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            // Üst bar: Ayarlar ikonu
-            _buildTopBar(),
-            const SizedBox(height: 8),
-            // Ay navigasyonu
-            _buildMonthNavigator(),
-            const SizedBox(height: 16),
-            // Takvim
-            Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.accentLight,
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          CalendarGrid(
-                            year: _currentYear,
-                            month: _currentMonth,
-                            monthlyData: _monthlyData,
-                            lang: widget.lang,
-                            onDayTapped: _openDayEntry,
-                          ),
-                          const SizedBox(height: 8),
-                          // Özet kartı
-                          SummaryCard(
-                            totalDays: _monthlyData.totalDays,
-                            totalEarnings: _monthlyData.totalEarnings,
-                            lang: widget.lang,
-                          ),
-                        ],
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      body: Column(
         children: [
-          // App logo / isim
-          const Text(
-            'DayTrack',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const Spacer(),
-          // Ayarlar butonu
-          IconButton(
-            onPressed: _openSettings,
-            icon: const Icon(
-              Icons.settings_rounded,
-              color: AppColors.textSecondary,
-              size: 24,
-            ),
-            style: IconButton.styleFrom(
-              backgroundColor: AppColors.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+          // Üst bar — farklı renk, yuvarlak alt köşeler
+          _buildTopBar(),
+          // Ay navigasyonu — ortalanmış
+          _buildMonthNavigator(),
+          const SizedBox(height: 12),
+          // Takvim + Özet
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.accentLight,
+                    ),
+                  )
+                : SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        CalendarGrid(
+                          year: _currentYear,
+                          month: _currentMonth,
+                          monthlyData: _monthlyData,
+                          lang: widget.lang,
+                          onDayTapped: _openDayEntry,
+                        ),
+                        const SizedBox(height: 8),
+                        // Özet kartı
+                        SummaryCard(
+                          totalDays: _monthlyData.totalDays,
+                          totalEarnings: _monthlyData.totalEarnings,
+                          lang: widget.lang,
+                        ),
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildTopBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(20),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 12, 14),
+          child: Row(
+            children: [
+              // App ikon
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.accentLight.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: AppColors.accentLight,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              // App isim — ayrı yazılış
+              const Text(
+                'Day Track',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const Spacer(),
+              // Ayarlar butonu
+              IconButton(
+                onPressed: _openSettings,
+                icon: const Icon(
+                  Icons.settings_rounded,
+                  color: AppColors.textSecondary,
+                  size: 24,
+                ),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMonthNavigator() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -212,34 +234,38 @@ class _HomePageState extends State<HomePage> {
                 size: 28,
               ),
             ),
-            // Ay ve yıl
-            GestureDetector(
-              onTap: () {
-                // Bugünün ayına dön
-                setState(() {
-                  _currentYear = DateTime.now().year;
-                  _currentMonth = DateTime.now().month;
-                });
-                _loadData();
-              },
-              child: Column(
-                children: [
-                  Text(
-                    widget.lang.monthName(_currentMonth),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+            // Ay ve yıl — ortalanmış
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  // Bugünün ayına dön
+                  setState(() {
+                    _currentYear = DateTime.now().year;
+                    _currentMonth = DateTime.now().month;
+                  });
+                  _loadData();
+                },
+                child: Column(
+                  children: [
+                    Text(
+                      widget.lang.monthName(_currentMonth),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                  Text(
-                    '$_currentYear',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
+                    Text(
+                      '$_currentYear',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             // Sağ ok
