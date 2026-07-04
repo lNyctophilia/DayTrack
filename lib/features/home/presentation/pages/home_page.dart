@@ -26,7 +26,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends State<HomePage> {
   late WorkDayRepository _repository;
   late int _currentYear;
   late int _currentMonth;
@@ -34,10 +34,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool _isLoading = true;
 
   // Animasyon kontrolü
-  late AnimationController _slideController;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _fadeAnimation;
-  int _slideDirection = 0; // -1: sola, 1: sağa
+  int _slideDirection = 1; // 1: sağa (önceki ay), -1: sola (sonraki ay)
 
   @override
   void initState() {
@@ -45,39 +42,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _repository = WorkDayRepository(widget.storage);
     _currentYear = widget.storage.getLastViewedYear();
     _currentMonth = widget.storage.getLastViewedMonth();
-
-    _slideController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _fadeAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-
     _loadData();
   }
 
   @override
   void dispose() {
-    _slideController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) setState(() => _isLoading = true);
     final data =
         await _repository.getMonthlyData(_currentYear, _currentMonth);
     setState(() {
@@ -89,32 +63,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   /// Animasyonlu ay değiştirme
-  Future<void> _animateMonthChange(int direction) async {
-    if (_slideController.isAnimating) return;
-
-    _slideDirection = direction;
-
-    // Çıkış animasyonu — mevcut içerik kayarak çıkar
-    _slideAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: Offset(direction.toDouble(), 0),
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeInCubic,
-    ));
-
-    _fadeAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeInCubic,
-    ));
-
-    await _slideController.forward();
-
-    // Ay değiştir
+  void _changeMonth(int direction) {
     setState(() {
+      _slideDirection = direction;
       if (direction == 1) {
         // Önceki ay
         if (_currentMonth == 1) {
@@ -133,38 +84,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         }
       }
     });
-
-    // Veriyi yükle
-    await _loadData();
-
-    // Giriş animasyonu — yeni içerik karşı taraftan girer
-    _slideController.reset();
-
-    _slideAnimation = Tween<Offset>(
-      begin: Offset(-direction.toDouble(), 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _slideController.forward();
+    _loadData(silent: true);
   }
 
   void _previousMonth() {
-    _animateMonthChange(1); // sağa kayar (önceki ay)
+    _changeMonth(1); // sağa kayar (önceki ay)
   }
 
   void _nextMonth() {
-    _animateMonthChange(-1); // sola kayar (sonraki ay)
+    _changeMonth(-1); // sola kayar (sonraki ay)
   }
 
   void _openDayEntry(DateTime date, WorkDay? existing) {
@@ -413,18 +341,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     behavior: HitTestBehavior.opaque,
                     child: Center(
                       child: SingleChildScrollView(
-                        child: AnimatedBuilder(
-                          animation: _slideController,
-                          builder: (context, child) {
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) {
+                            // Giren widget key'i güncel ay ile eşleşir
+                            final isIncoming = child.key == ValueKey('$_currentYear-$_currentMonth');
+                            final offsetTween = Tween<Offset>(
+                              begin: Offset(isIncoming ? -_slideDirection.toDouble() : _slideDirection.toDouble(), 0),
+                              end: Offset.zero,
+                            );
                             return SlideTransition(
-                              position: _slideAnimation,
+                              position: offsetTween.animate(animation),
                               child: FadeTransition(
-                                opacity: _fadeAnimation,
+                                opacity: animation,
                                 child: child,
                               ),
                             );
                           },
                           child: Column(
+                            key: ValueKey('$_currentYear-$_currentMonth'),
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               CalendarGrid(
