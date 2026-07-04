@@ -390,7 +390,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           _buildTopBar(),
           // Ay navigasyonu — ortalanmış
           _buildMonthNavigator(),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           // Takvim + Özet — sola/sağa kaydırarak ay değiştirme, ekranda ortalanmış
           Expanded(
             child: _isLoading
@@ -435,7 +435,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 onDayTapped: _openDayEntry,
                                 onDayLongPressed: _showNotePreview,
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 20),
                               // Özet kartı
                               SummaryCard(
                                 totalDays: _monthlyData.totalDays,
@@ -518,7 +518,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Widget _buildMonthNavigator() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
