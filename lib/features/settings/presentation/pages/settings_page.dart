@@ -414,9 +414,9 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 16),
           const Divider(color: AppColors.divider),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             _developerName,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: AppColors.accentLight,
