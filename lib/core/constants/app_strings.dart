@@ -86,6 +86,8 @@ class AppStrings {
     'general': {'tr': 'Genel', 'en': 'General'},
     'data': {'tr': 'Veri', 'en': 'Data'},
     'saved': {'tr': 'Kaydedildi', 'en': 'Saved'},
+    'no_note': {'tr': 'Not yok', 'en': 'No note'},
+    'no_entry': {'tr': 'Kayıt yok', 'en': 'No entry'},
   };
 
   static const List<String> monthKeys = [

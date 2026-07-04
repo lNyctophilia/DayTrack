@@ -12,6 +12,7 @@ class CalendarGrid extends StatelessWidget {
   final MonthlyData monthlyData;
   final LanguageService lang;
   final void Function(DateTime date, WorkDay? existing) onDayTapped;
+  final void Function(DateTime date, WorkDay? existing) onDayLongPressed;
 
   const CalendarGrid({
     super.key,
@@ -20,6 +21,7 @@ class CalendarGrid extends StatelessWidget {
     required this.monthlyData,
     required this.lang,
     required this.onDayTapped,
+    required this.onDayLongPressed,
   });
 
   @override
@@ -85,6 +87,7 @@ class CalendarGrid extends StatelessWidget {
           return Expanded(
             child: GestureDetector(
               onTap: () => onDayTapped(date, workDay),
+              onLongPress: () => onDayLongPressed(date, workDay),
               child: _DayCell(
                 day: dayIndex,
                 workDay: workDay,
