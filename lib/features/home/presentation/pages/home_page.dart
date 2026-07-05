@@ -380,14 +380,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Arkaplan Filigranı
-          Positioned(
-            bottom: -80,
-            right: -60,
-            child: Icon(
-              Icons.account_balance_wallet_rounded,
-              size: 350,
-              color: AppColors.accentLight.withValues(alpha: 0.03),
+          // Arkaplan Deseni (Tam Ekran, Daha Saydam)
+          Positioned.fill(
+            child: CustomPaint(
+              painter: BackgroundPatternPainter(
+                color: AppColors.textHint.withValues(alpha: 0.04),
+              ),
             ),
           ),
           Column(
@@ -703,17 +701,31 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildMiniChart(MonthlyData data) {
-    if (data.totalEarnings == 0) return const SizedBox.shrink();
-
-    double maxEarn = 0;
-    for (var day in data.workDays) {
-      if (day.payment > maxEarn) maxEarn = day.payment;
-    }
+    if (data.totalDays == 0) return const SizedBox.shrink();
 
     final daysInMonth = DateUtils.getDaysInMonth(data.year, data.month);
+    
+    List<double> intensities = [];
+    double currentIntensity = 0.0;
+    double maxIntensity = 1.0; 
+
+    for (int i = 1; i <= daysInMonth; i++) {
+      final hasWork = data.getWorkDay(i) != null;
+      if (hasWork) {
+        currentIntensity += 1.0; // Gittikçe yoğunluk artar (tepe oluşur)
+      } else {
+        // İşe gitmedikçe yoğunluk azalır, birkaç gün sonra 0'a iner
+        currentIntensity = (currentIntensity - 0.75).clamp(0.0, double.infinity);
+      }
+      intensities.add(currentIntensity);
+      if (currentIntensity > maxIntensity) {
+        maxIntensity = currentIntensity;
+      }
+    }
+
+    final isTr = widget.lang.currentLang == 'tr';
 
     return Container(
-      height: 60,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -721,31 +733,37 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.divider, width: 1),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(daysInMonth, (index) {
-          final dayNum = index + 1;
-          final dayData = data.getWorkDay(dayNum);
-          
-          final dayPayment = dayData?.payment ?? 0.0;
-          final heightFactor = maxEarn > 0 ? dayPayment / maxEarn : 0.0;
-          
-          return Flexible(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: dayPayment > 0 
-                      ? AppColors.accentLight 
-                      : AppColors.surface,
-                  borderRadius: BorderRadius.circular(2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isTr ? 'Aylık İş Yoğunluğu' : 'Monthly Work Intensity',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
-                height: heightFactor > 0 ? 36 * heightFactor : 4,
+              ),
+              Icon(Icons.terrain_rounded, color: AppColors.accentLight, size: 18),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 55,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: IntensityWavePainter(
+                intensities: intensities,
+                maxIntensity: maxIntensity,
+                color: AppColors.accentLight,
               ),
             ),
-          );
-        }),
+          ),
+          const SizedBox(height: 5),
+        ],
       ),
     );
   }
@@ -833,4 +851,125 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       ],
     );
   }
+}
+
+/// Arkaplan için tüm ekranı kaplayan, şık ve çok saydam nokta (dot) deseni
+class BackgroundPatternPainter extends CustomPainter {
+  final Color color;
+
+  BackgroundPatternPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    const double spacing = 24.0;
+    const double radius = 1.2;
+
+    for (double y = 0; y < size.height + spacing; y += spacing) {
+      for (double x = 0; x < size.width + spacing; x += spacing) {
+        // Satırlara göre hafif kaydırma (çapraz bir his vermek için)
+        final offsetX = (y / spacing) % 2 == 0 ? 0.0 : spacing / 2.0;
+        canvas.drawCircle(Offset(x + offsetX, y), radius, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// İş yoğunluğunu dalgalı bir alan (area chart) olarak çizen painter
+class IntensityWavePainter extends CustomPainter {
+  final List<double> intensities;
+  final double maxIntensity;
+  final Color color;
+
+  IntensityWavePainter({
+    required this.intensities,
+    required this.maxIntensity,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (intensities.isEmpty) return;
+
+    final stepX = size.width / (intensities.length - 1);
+    final points = <Offset>[];
+
+    for (int i = 0; i < intensities.length; i++) {
+      final x = i * stepX;
+      // Normalizasyon: 0'da dipte (size.height), maxIntensity'de en üstte (0)
+      final normalizedY = intensities[i] / maxIntensity;
+      final y = size.height - (normalizedY * size.height);
+      points.add(Offset(x, y));
+    }
+
+    // Yumuşak Dalga (Bezier) Yolu Oluşturma
+    final wavePath = Path();
+    wavePath.moveTo(points.first.dx, points.first.dy);
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final p0 = points[i];
+      final p1 = points[i + 1];
+      // Yumuşak geçiş (spline)
+      final controlPointX = (p0.dx + p1.dx) / 2;
+      wavePath.cubicTo(
+        controlPointX, p0.dy,
+        controlPointX, p1.dy,
+        p1.dx, p1.dy,
+      );
+    }
+
+    // Alanı (Alt Kısmı) Boyamak İçin Yolu Kapatma
+    final fillPath = Path.from(wavePath);
+    fillPath.lineTo(size.width, size.height);
+    fillPath.lineTo(0, size.height);
+    fillPath.close();
+
+    // Boya: Yukarıdan aşağıya opasitesi azalan gradient
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          color.withValues(alpha: 0.5),
+          color.withValues(alpha: 0.0),
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(fillPath, fillPaint);
+
+    // Çizgi: Dalganın üst sınır çizgisi
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawPath(wavePath, linePaint);
+
+    // İş gidilen noktaları işaretleme (Zirveler)
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    for (int i = 0; i < points.length; i++) {
+      // Eğer o gün yoğunluk arttıysa (işe gidildiyse) küçük bir nokta koy
+      // (Bunu önceki günden büyük olmasıyla veya sıfırdan büyük olmasıyla anlayabiliriz)
+      if (i > 0 && intensities[i] > intensities[i - 1]) {
+        canvas.drawCircle(points[i], 3.0, dotPaint);
+      } else if (i == 0 && intensities[i] > 0) {
+        canvas.drawCircle(points[i], 3.0, dotPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant IntensityWavePainter oldDelegate) => true;
 }
