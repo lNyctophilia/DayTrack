@@ -46,7 +46,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   int? _prevMonth;
   MonthlyData? _prevMonthlyData;
   bool _isAnimating = false;
-  int _slideDirection = 1;
 
   @override
   void initState() {
@@ -83,7 +82,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _prevYear = _currentYear;
     _prevMonth = _currentMonth;
     _prevMonthlyData = _monthlyData;
-    _slideDirection = direction;
 
     // Yeni ayı hesapla
     if (direction == 1) {
@@ -379,37 +377,52 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
+      backgroundColor: AppColors.background,
+      body: Stack(
         children: [
-          // Üst bar — farklı renk, yuvarlak alt köşeler
-          _buildTopBar(),
-          // Takvim + Ay navigasyonu + Özet — kaydırılabilir, ortalanmış
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.accentLight,
-                    ),
-                  )
-                : GestureDetector(
-                    onHorizontalDragEnd: (details) {
-                      const threshold = 300.0;
-                      final velocity = details.primaryVelocity ?? 0;
-                      if (velocity > threshold) {
-                        _previousMonth();
-                      } else if (velocity < -threshold) {
-                        _nextMonth();
-                      }
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Center(
-                      child: SingleChildScrollView(
-                        child: _isAnimating
-                            ? _buildAnimatedContent()
-                            : _buildStaticContent(),
+          // Arkaplan Filigranı
+          Positioned(
+            bottom: -80,
+            right: -60,
+            child: Icon(
+              Icons.account_balance_wallet_rounded,
+              size: 350,
+              color: AppColors.accentLight.withValues(alpha: 0.03),
+            ),
+          ),
+          Column(
+            children: [
+              // Üst bar — farklı renk, yuvarlak alt köşeler
+              _buildTopBar(),
+              // Takvim + Ay navigasyonu + Özet — kaydırılabilir, ortalanmış
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.accentLight,
+                        ),
+                      )
+                    : GestureDetector(
+                        onHorizontalDragEnd: (details) {
+                          const threshold = 300.0;
+                          final velocity = details.primaryVelocity ?? 0;
+                          if (velocity > threshold) {
+                            _previousMonth();
+                          } else if (velocity < -threshold) {
+                            _nextMonth();
+                          }
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: Center(
+                          child: SingleChildScrollView(
+                            child: _isAnimating
+                                ? _buildAnimatedContent()
+                                : _buildStaticContent(),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+              ),
+            ],
           ),
         ],
       ),
@@ -420,7 +433,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget _buildStaticContent() {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildGreeting(_monthlyData),
         _buildMonthNavigator(_currentYear, _currentMonth),
         const SizedBox(height: 16),
         CalendarGrid(
@@ -431,12 +446,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           onDayTapped: _openDayEntry,
           onDayLongPressed: _showNotePreview,
         ),
-        const SizedBox(height: 25),
+        const SizedBox(height: 15),
+        _buildMiniChart(_monthlyData),
         SummaryCard(
           totalDays: _monthlyData.totalDays,
           totalEarnings: _monthlyData.totalEarnings,
           lang: widget.lang,
         ),
+        _buildRecentNotes(_monthlyData),
       ],
     );
   }
@@ -453,7 +470,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               opacity: _outFadeAnimation,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildGreeting(_prevMonthlyData!),
                   _buildMonthNavigator(_prevYear!, _prevMonth!),
                   const SizedBox(height: 16),
                   CalendarGrid(
@@ -464,12 +483,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     onDayTapped: _openDayEntry,
                     onDayLongPressed: _showNotePreview,
                   ),
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 15),
+                  _buildMiniChart(_prevMonthlyData!),
                   SummaryCard(
                     totalDays: _prevMonthlyData!.totalDays,
                     totalEarnings: _prevMonthlyData!.totalEarnings,
                     lang: widget.lang,
                   ),
+                  _buildRecentNotes(_prevMonthlyData!),
                 ],
               ),
             ),
@@ -481,7 +502,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             opacity: _inFadeAnimation,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildGreeting(_monthlyData),
                 _buildMonthNavigator(_currentYear, _currentMonth),
                 const SizedBox(height: 16),
                 CalendarGrid(
@@ -492,12 +515,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   onDayTapped: _openDayEntry,
                   onDayLongPressed: _showNotePreview,
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 15),
+                _buildMiniChart(_monthlyData),
                 SummaryCard(
                   totalDays: _monthlyData.totalDays,
                   totalEarnings: _monthlyData.totalEarnings,
                   lang: widget.lang,
                 ),
+                _buildRecentNotes(_monthlyData),
               ],
             ),
           ),
@@ -570,7 +595,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Widget _buildMonthNavigator(int year, int month) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 35, 16, 35),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -635,6 +660,177 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGreeting(MonthlyData data) {
+    final isTr = widget.lang.currentLang == 'tr';
+    final greeting = isTr ? 'Merhaba,' : 'Hello,';
+    final motivation = data.totalDays > 0
+        ? (isTr
+            ? 'Bu ay ${data.totalDays} gün çalıştın, harika gidiyorsun!'
+            : 'You worked ${data.totalDays} days this month, keep it up!')
+        : (isTr
+            ? 'Bu ay için henüz kayıt girmedin. Hadi başlayalım!'
+            : 'No entries for this month yet. Let\'s start!');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            greeting,
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            motivation,
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniChart(MonthlyData data) {
+    if (data.totalEarnings == 0) return const SizedBox.shrink();
+
+    double maxEarn = 0;
+    for (var day in data.workDays) {
+      if (day.payment > maxEarn) maxEarn = day.payment;
+    }
+
+    final daysInMonth = DateUtils.getDaysInMonth(data.year, data.month);
+
+    return Container(
+      height: 60,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider, width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(daysInMonth, (index) {
+          final dayNum = index + 1;
+          final dayData = data.getWorkDay(dayNum);
+          
+          final dayPayment = dayData?.payment ?? 0.0;
+          final heightFactor = maxEarn > 0 ? dayPayment / maxEarn : 0.0;
+          
+          return Flexible(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 1.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: dayPayment > 0 
+                      ? AppColors.accentLight 
+                      : AppColors.surface,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                height: heightFactor > 0 ? 36 * heightFactor : 4,
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildRecentNotes(MonthlyData data) {
+    final daysWithNotes = data.workDays.where((d) => d.note.trim().isNotEmpty).toList();
+    daysWithNotes.sort((a, b) => b.date.compareTo(a.date));
+
+    if (daysWithNotes.isEmpty) return const SizedBox.shrink();
+
+    final isTr = widget.lang.currentLang == 'tr';
+    final title = isTr ? 'Son Notlar' : 'Recent Notes';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: daysWithNotes.length,
+            itemBuilder: (context, index) {
+              final day = daysWithNotes[index];
+              final monthName = widget.lang.monthName(day.date.month);
+              final dateStr = '${day.date.day} $monthName';
+
+              return Container(
+                width: 220,
+                margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.divider, width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.sticky_note_2_rounded, size: 14, color: AppColors.accentLight),
+                        const SizedBox(width: 6),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: Text(
+                        day.note.trim(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 }
