@@ -88,6 +88,12 @@ class AppStrings {
     'saved': {'tr': 'Kaydedildi', 'en': 'Saved'},
     'no_note': {'tr': 'Not yok', 'en': 'No note'},
     'no_entry': {'tr': 'Kayıt yok', 'en': 'No entry'},
+    'install_ios': {'tr': 'iPhone\'a Yükle', 'en': 'Install on iPhone'},
+    'install_ios_title': {'tr': 'Ana Ekrana Ekle', 'en': 'Add to Home Screen'},
+    'install_ios_desc': {
+      'tr': 'Safari\'nin alt menüsündeki "Paylaş" ikonuna dokunun ve "Ana Ekrana Ekle" seçeneğini seçin.',
+      'en': 'Tap the "Share" icon in Safari\'s bottom menu and select "Add to Home Screen".'
+    },
   };
 
   static const List<String> monthKeys = [

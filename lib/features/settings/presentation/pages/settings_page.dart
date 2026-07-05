@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_config.dart';
 import '../../../../core/services/language_service.dart';
@@ -109,6 +110,71 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _showIOSInstallPopup() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.accentLight.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.ios_share_rounded,
+                color: AppColors.accentLight,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              widget.lang.tr('install_ios_title'),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        content: Text(
+          widget.lang.tr('install_ios_desc'),
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            height: 1.5,
+            fontSize: 15,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.surface,
+              foregroundColor: AppColors.textPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+        actionsAlignment: MainAxisAlignment.center,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -141,6 +207,7 @@ class _SettingsPageState extends State<SettingsPage> {
           // ─── Genel ─────────────────────────────────────
           _buildSectionHeader(widget.lang.tr('general')),
           _buildLanguageTile(),
+          if (kIsWeb) _buildIOSInstallTile(),
           const SizedBox(height: 8),
 
           // ─── Veri ──────────────────────────────────────
@@ -325,6 +392,46 @@ class _SettingsPageState extends State<SettingsPage> {
                 ? Colors.white
                 : AppColors.textSecondary,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIOSInstallTile() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.accentLight.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(
+            Icons.apple_rounded,
+            color: AppColors.accentLight,
+            size: 22,
+          ),
+        ),
+        title: Text(
+          widget.lang.tr('install_ios'),
+          style: const TextStyle(
+            fontSize: 15,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: AppColors.textHint,
+        ),
+        onTap: _showIOSInstallPopup,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
     );
