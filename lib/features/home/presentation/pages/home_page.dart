@@ -431,7 +431,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           onDayTapped: _openDayEntry,
           onDayLongPressed: _showNotePreview,
         ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 25),
         SummaryCard(
           totalDays: _monthlyData.totalDays,
           totalEarnings: _monthlyData.totalEarnings,
@@ -464,7 +464,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     onDayTapped: _openDayEntry,
                     onDayLongPressed: _showNotePreview,
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 25),
                   SummaryCard(
                     totalDays: _prevMonthlyData!.totalDays,
                     totalEarnings: _prevMonthlyData!.totalEarnings,
@@ -492,7 +492,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   onDayTapped: _openDayEntry,
                   onDayLongPressed: _showNotePreview,
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 25),
                 SummaryCard(
                   totalDays: _monthlyData.totalDays,
                   totalEarnings: _monthlyData.totalEarnings,
@@ -570,7 +570,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Widget _buildMonthNavigator(int year, int month) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 50, 16, 50),
+      padding: const EdgeInsets.fromLTRB(16, 35, 16, 35),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
